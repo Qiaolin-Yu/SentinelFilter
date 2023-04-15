@@ -6,7 +6,6 @@ The server supports the following HTTP endpoints:
 
 - `GET /?key=<value>`: Returns a boolean indicating whether the given value may be in the Bloom filter or not.
 - `POST /`: Adds a value to the Bloom filter. The value should be provided as a JSON payload with the key "key".
-- `DELETE /?key=<value>`: Removes a value from the Bloom filter.
 
 ## How to use
 Note that the server uses a mutex to ensure that the Bloom filter can be used concurrently by multiple HTTP clients.
