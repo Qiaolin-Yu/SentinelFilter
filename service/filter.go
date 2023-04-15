@@ -3,59 +3,60 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
+	"github.com/spaolacci/murmur3"
+	"hash"
 	"math"
 	"net/http"
 	"sync"
 )
 
 type BloomFilter struct {
-	bitArray []bool
-	k        uint32 // number of hash functions
-	m        uint32 // number of bits in the filter
-	mu       sync.Mutex
+	m       uint
+	k       uint
+	buckets []bool
+	hashfn  []hash.Hash32
+	mux     sync.Mutex
 }
 
-func NewBloomFilter(n uint32, p float64) *BloomFilter {
-	m := uint32(-1 * float64(n) * math.Log(p) / (math.Ln2 * math.Ln2))
-	k := uint32(math.Ceil((float64(m) / float64(n)) * math.Ln2))
-	return &BloomFilter{make([]bool, m), k, m, sync.Mutex{}}
-}
-
-func (bf *BloomFilter) add(value string) {
-	bf.mu.Lock()
-	defer bf.mu.Unlock()
-	for i := uint32(0); i < bf.k; i++ {
-		hash := fnv.New32a()
-		hash.Write([]byte(fmt.Sprintf("%s%d", value, i)))
-		index := hash.Sum32() % bf.m
-		bf.bitArray[index] = true
+func NewBloomFilter(m uint, p float64) *BloomFilter {
+	k := uint(math.Ceil(-math.Log2(p)))
+	hashfn := make([]hash.Hash32, k)
+	for i := uint(0); i < k; i++ {
+		hashfn[i] = murmur3.New32WithSeed(uint32(i))
+	}
+	return &BloomFilter{
+		m:       m,
+		k:       k,
+		buckets: make([]bool, m),
+		hashfn:  hashfn,
 	}
 }
 
-func (bf *BloomFilter) contains(value string) bool {
-	bf.mu.Lock()
-	defer bf.mu.Unlock()
-	for i := uint32(0); i < bf.k; i++ {
-		hash := fnv.New32a()
-		hash.Write([]byte(fmt.Sprintf("%s%d", value, i)))
-		index := hash.Sum32() % bf.m
-		if !bf.bitArray[index] {
+func (bf *BloomFilter) add(key string) {
+	bf.mux.Lock()
+	defer bf.mux.Unlock()
+	for i := uint(0); i < bf.k; i++ {
+		hash := bf.hashfn[i]
+		hash.Write([]byte(key))
+		index := uint(hash.Sum32()) % bf.m
+		bf.buckets[index] = true
+		hash.Reset()
+	}
+}
+
+func (bf *BloomFilter) check(key string) bool {
+	bf.mux.Lock()
+	defer bf.mux.Unlock()
+	for i := uint(0); i < bf.k; i++ {
+		hash := bf.hashfn[i]
+		hash.Write([]byte(key))
+		index := uint(hash.Sum32()) % bf.m
+		if !bf.buckets[index] {
 			return false
 		}
+		hash.Reset()
 	}
 	return true
-}
-
-func (bf *BloomFilter) delete(value string) {
-	bf.mu.Lock()
-	defer bf.mu.Unlock()
-	for i := uint32(0); i < bf.k; i++ {
-		hash := fnv.New32a()
-		hash.Write([]byte(fmt.Sprintf("%s%d", value, i)))
-		index := hash.Sum32() % bf.m
-		bf.bitArray[index] = false
-	}
 }
 
 func (bf *BloomFilter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -64,10 +65,8 @@ func (bf *BloomFilter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		bf.handleGet(w, r)
 	case http.MethodPost:
 		bf.handlePost(w, r)
-	case http.MethodDelete:
-		bf.handleDelete(w, r)
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -77,13 +76,8 @@ func (bf *BloomFilter) handleGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Key is missing", http.StatusBadRequest)
 		return
 	}
-	if bf.contains(key) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "true")
-	} else {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, "false")
-	}
+	ok := bf.check(key)
+	fmt.Fprint(w, ok)
 }
 
 func (bf *BloomFilter) handlePost(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +86,7 @@ func (bf *BloomFilter) handlePost(w http.ResponseWriter, r *http.Request) {
 	}
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 	if data.Key == "" {
@@ -100,15 +94,5 @@ func (bf *BloomFilter) handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	bf.add(data.Key)
-	w.WriteHeader(http.StatusCreated)
-}
-
-func (bf *BloomFilter) handleDelete(w http.ResponseWriter, r *http.Request) {
-	key := r.URL.Query().Get("key")
-	if key == "" {
-		http.Error(w, "Key is missing", http.StatusBadRequest)
-		return
-	}
-	bf.delete(key)
 	w.WriteHeader(http.StatusNoContent)
 }

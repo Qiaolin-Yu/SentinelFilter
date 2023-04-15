@@ -9,11 +9,12 @@ The server supports the following HTTP endpoints:
 - `DELETE /?key=<value>`: Removes a value from the Bloom filter.
 
 ## How to use
+Note that the server uses a mutex to ensure that the Bloom filter can be used concurrently by multiple HTTP clients.
 To use the HTTP interface for the Bloom filter, you can follow these steps:
 
 ### 1. Run the server with the following command:
 ```bash
-go run main.go
+go run ./...
 ```
 By default, the server listens on port 7070.
 
@@ -28,8 +29,3 @@ If the value is in the Bloom filter, the server will return "true". Otherwise, i
 ```bash
 curl -d '{"key":"value"}' -H "Content-Type: application/json" -X POST http://localhost:7070/
 ```
-### 4. Remove a value from the Bloom filter using a DELETE request:
-```bash
-curl -X DELETE http://localhost:7070/?key=value
-```
-Note that the server uses a mutex to ensure that the Bloom filter can be used concurrently by multiple HTTP clients.
