@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package service;
+
+option go_package = "google.golang.org/grpc/examples/filter/filter";
+
+import "google/protobuf/empty.proto";
+
+service BloomFilterService {
+  rpc Add(AddRequest) returns (google.protobuf.Empty) {}
+  rpc Check(CheckRequest) returns (CheckResponse) {}
+}
+
+message AddRequest {
+  string key = 1;
+}
+
+message CheckRequest {
+  string key = 1;
+}
+
+message CheckResponse {
+  bool exists = 1;
+}
