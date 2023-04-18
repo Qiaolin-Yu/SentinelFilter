@@ -14,9 +14,9 @@ func TestConcurrency(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			bf.add(fmt.Sprintf("key%d", i))
+			bf.Add(fmt.Sprintf("key%d", i))
 			if i%2 != 0 {
-				assert.True(t, bf.check(fmt.Sprintf("key%d", i)))
+				assert.True(t, bf.Check(fmt.Sprintf("key%d", i)))
 			}
 		}(i)
 	}
@@ -25,10 +25,10 @@ func TestConcurrency(t *testing.T) {
 
 func TestFilter(t *testing.T) {
 	bf := NewBloomFilter(1000, 0.01)
-	bf.add("hello")
-	bf.add("world")
-	fmt.Println(bf.check("hello")) // true
-	fmt.Println(bf.check("world")) // true
-	fmt.Println(bf.check("foo"))   // false
-	fmt.Println(bf.check("a"))     // false
+	bf.Add("hello")
+	bf.Add("world")
+	fmt.Println(bf.Check("hello")) // true
+	fmt.Println(bf.Check("world")) // true
+	fmt.Println(bf.Check("foo"))   // false
+	fmt.Println(bf.Check("a"))     // false
 }
