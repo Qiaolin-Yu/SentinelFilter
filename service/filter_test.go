@@ -15,9 +15,7 @@ func TestConcurrency(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			bf.Add(fmt.Sprintf("key%d", i))
-			if i%2 != 0 {
-				assert.True(t, bf.Check(fmt.Sprintf("key%d", i)))
-			}
+			assert.True(t, bf.Check(fmt.Sprintf("key%d", i)))
 		}(i)
 	}
 	wg.Wait()
