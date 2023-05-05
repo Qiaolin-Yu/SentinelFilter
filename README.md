@@ -1,4 +1,4 @@
-# Sentinel: Bloom Filter-as-a-Service
+# SentinelFilter: Bloom Filter-as-a-Service
 
 This is a simple HTTP server that provides an interface to use a Bloom filter. A Bloom filter is a probabilistic data structure that allows you to quickly check if an item is a member of a set or not. It now also supports the gRPC protocol.
 
